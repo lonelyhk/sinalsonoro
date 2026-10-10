@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sinal Sonoro — Código Fixo</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: #fff;
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .wrap {
+    width: 100%; max-width: 440px;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 30px 24px;
+    text-align: center;
+  }
+  h1 {
+    font-size: 20px; margin-bottom: 6px;
+    background: linear-gradient(90deg, #667eea, #f5576c);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .sub { color: #888; font-size: 13px; margin-bottom: 25px; }
+
+  .painel { display: none; }
+  .painel.ativo { display: block; }
+
+  .card-id {
+    background: rgba(102,126,234,0.15);
+    border: 2px solid #667eea;
+    border-radius: 14px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .card-id label { color: #aab; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  .card-id .codigo {
+    font-size: 42px; font-weight: 900; font-family: monospace;
+    letter-spacing: 8px; color: #667eea; margin: 10px 0;
+  }
+  .card-id .info { color: #888; font-size: 12px; }
+
+  input[type="text"] {
+    width: 100%; padding: 16px;
+    font-size: 28px; text-align: center; letter-spacing: 6px;
+    background: rgba(0,0,0,0.3); border: 2px solid #333;
+    border-radius: 12px; color: #fff; font-family: monospace;
+    text-transform: uppercase; margin-bottom: 15px;
+  }
+  input[type="text"]:focus { outline: none; border-color: #f5576c; }
+
+  button {
+    width: 100%; padding: 18px; border: none; border-radius: 14px;
+    font-size: 16px; font-weight: 700; cursor: pointer;
+    transition: all .2s; margin-bottom: 10px; font-family: inherit;
+  }
+  button:active { transform: scale(0.98); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-primario { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+  .btn-perigo {
+    background: linear-gradient(135deg, #f5576c, #f093fb); color: #fff;
+    padding: 35px; font-size: 22px; letter-spacing: 2px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(245,87,108,0.7); }
+    50% { box-shadow: 0 0 0 20px rgba(245,87,108,0); }
+  }
+  .btn-secundario {
+    background: rgba(255,255,255,0.1); color: #ccc;
+    font-size: 14px; padding: 14px;
+  }
+
+  .status { padding: 12px; border-radius: 10px; font-size: 13px; margin-bottom: 15px; }
+  .status.online { background: rgba(0,200,100,0.15); color: #4ade80; border: 1px solid #4ade80; }
+  .status.offline { background: rgba(255,100,100,0.15); color: #f87171; border: 1px solid #f87171; }
+  .status.waiting { background: rgba(255,200,0,0.15); color: #fbbf24; border: 1px solid #fbbf24; }
+
+  .log {
+    background: rgba(0,0,0,0.4); border-radius: 10px;
+    padding: 12px; font-family: monospace; font-size: 11px;
+    color: #888; max-height: 120px; overflow-y: auto;
+    text-align: left; margin-top: 15px;
+  }
+  .log p { margin: 3px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>📡 Sinal Sonoro</h1>
+  <p class="sub">Conexão direta entre dois celulares</p>
+
+  <!-- PAINEL 1: Escolher modo -->
+  <div class="painel ativo" id="painelInicio">
+    <button class="btn-primario" onclick="modoReceptor()">
+      📱 RECEBER SINAL
+    </button>
+    <button class="btn-primario" onclick="modoEmissor()">
+      🔔 ENVIAR SINAL
+    </button>
+    <p style="color:#666;font-size:12px;margin-top:15px">
+      Um celular escolhe "receber" e o outro "enviar"
+    </p>
+  </div>
+
+  <!-- PAINEL 2: Receptor -->
+  <div class="painel" id="painelReceptor">
+    <div class="card-id">
+      <label>Seu código permanente</label>
+      <div class="codigo" id="meuCodigo">----</div>
+      <div class="info">Digite este código no outro celular</div>
+    </div>
+    <div class="status waiting" id="statusReceptor">⏳ Aguardando conexão...</div>
+    <button class="btn-secundario" onclick="location.reload()">← Voltar</button>
+  </div>
+
+  <!-- PAINEL 3: Emissor -->
+  <div class="painel" id="painelEmissor">
+    <input type="text" id="inputCodigo" maxlength="4" placeholder="ABCD" autocomplete="off">
+    <button class="btn-primario" id="btnConectar" onclick="conectar()">
+      🔗 CONECTAR
+    </button>
+    <div class="status offline" id="statusEmissor">Desconectado</div>
+    <button class="btn-secundario" onclick="location.reload()">← Voltar</button>
+  </div>
+
+  <!-- PAINEL 4: Emissor conectado -->
+  <div class="painel" id="painelEmissorConectado">
+    <div class="status online" id="statusEmissorOnline">✅ Conectado ao receptor</div>
+    <button class="btn-perigo" onclick="disparar()">
+      🔔 TOCAR SOM
+    </button>
+    <button class="btn-secundario" onclick="location.reload()">← Desconectar</button>
+    <div class="log" id="logEmissor"></div>
+  </div>
+
+  <!-- PAINEL 5: Receptor conectado -->
+  <div class="painel" id="painelReceptorConectado">
+    <div class="status online" id="statusReceptorOnline">✅ Emissor conectado</div>
+    <p style="color:#888;font-size:13px;padding:20px 0">
+      Aguardando sinal...<br>
+      <strong style="color:#667eea">Deixe esta tela aberta</strong>
+    </p>
+    <div class="log" id="logReceptor"></div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+<script>
+/* ============================================================
+   SINAL SONORO — CÓDIGO FIXO + RECONEXÃO AUTOMÁTICA
+
+   Diferença desta versão:
+   - O código fica salvo no localStorage (não muda ao recarregar)
+   - O receptor reconecta automaticamente se cair
+   - O emissor tenta reconectar sozinho se perder a conexão
+   ============================================================ */
+
+// ⚠️ DEFINA AQUI O CÓDIGO FIXO (4 caracteres)
+// Você e o menino combinam este código. Ele NUNCA muda.
+const CODIGO_FIXO = "SOS1";
+
+let peer = null;
+let conn = null;
+let modo = null;
+let reconectarTimer = null;
+
+// Configuração do PeerJS com STUN + TURN (funciona em redes diferentes)
+const PEER_CONFIG = {
+  debug: 1,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
+    ]
+  }
+};
+
+// --- Painéis ---
+function mostrar(id) {
+  document.querySelectorAll('.painel').forEach(p => p.classList.remove('ativo'));
+  document.getElementById(id).classList.add('ativo');
+}
+
+function log(painelId, msg) {
+  const el = document.getElementById(painelId);
+  if (!el) return;
+  const p = document.createElement('p');
+  const hora = new Date().toLocaleTimeString('pt-BR');
+  p.textContent = `[${hora}] ${msg}`;
+  el.appendChild(p);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════
+//  MODO RECEPTOR
+// ═══════════════════════════════════════════════════════
+function modoReceptor() {
+  modo = 'receptor';
+  mostrar('painelReceptor');
+
+  document.getElementById('meuCodigo').textContent = CODIGO_FIXO;
+
+  iniciarPeerReceptor();
+}
+
+function iniciarPeerReceptor() {
+  const peerId = 'sinal-sonoro-' + CODIGO_FIXO;
+
+  if (peer && !peer.destroyed) {
+    try { peer.destroy(); } catch(e) {}
+  }
+
+  peer = new Peer(peerId, PEER_CONFIG);
+
+  peer.on('open', (id) => {
+    console.log('Receptor pronto. ID:', id);
+    document.getElementById('statusReceptor').textContent =
+      '⏳ Aguardando conexão... Código: ' + CODIGO_FIXO;
+    document.getElementById('statusReceptor').className = 'status waiting';
+  });
+
+  peer.on('connection', (connection) => {
+    conn = connection;
+    console.log('Emissor conectou!');
+
+    document.getElementById('statusReceptor').textContent = '✅ Conectado!';
+    document.getElementById('statusReceptor').className = 'status online';
+
+    setTimeout(() => {
+      mostrar('painelReceptorConectado');
+      document.getElementById('statusReceptorOnline').textContent = '✅ Emissor conectado';
+      document.getElementById('statusReceptorOnline').className = 'status online';
+      log('logReceptor', 'Emissor conectado');
+    }, 500);
+
+    conn.on('data', (data) => {
+      console.log('Recebeu:', data);
+      if (data && data.tipo === 'TOCAR') {
+        log('logReceptor', '🔔 SINAL RECEBIDO — tocando som');
+        tocarSom();
+      }
+    });
+
+    conn.on('close', () => {
+      log('logReceptor', '⚠️ Emissor desconectou — aguardando reconexão');
+      document.getElementById('statusReceptorOnline').textContent = '⚠️ Desconectado — aguardando...';
+      document.getElementById('statusReceptorOnline').className = 'status waiting';
+
+      // Não volta pra tela inicial — só aguarda reconexão
+      conn = null;
+    });
+
+    conn.on('error', (err) => {
+      log('logReceptor', 'Erro na conexão: ' + err);
+    });
+  });
+
+  peer.on('error', (err) => {
+    console.error('Erro peer receptor:', err);
+
+    // Se o erro for "ID taken" (outro dispositivo pegou o código),
+    // tenta novamente em 3 segundos
+    if (err.type === 'unavailable-id') {
+      log('logReceptor', '⚠️ ID em uso, tentando de novo em 3s...');
+      document.getElementById('statusReceptor').textContent =
+        '⏳ Reconectando...';
+      document.getElementById('statusReceptor').className = 'status waiting';
+      setTimeout(iniciarPeerReceptor, 3000);
+    } else if (err.type === 'network' || err.type === 'server-error') {
+      // Erro de rede — tenta reconectar
+      log('logReceptor', '⚠️ Erro de rede, reconectando em 3s...');
+      setTimeout(iniciarPeerReceptor, 3000);
+    } else {
+      document.getElementById('statusReceptor').textContent = '⚠️ Erro: ' + err.type;
+      document.getElementById('statusReceptor').className = 'status offline';
+    }
+  });
+
+  // Detecção de perda de conexão geral
+  peer.on('disconnected', () => {
+    console.log('Peer desconectado do servidor, tentando reconectar...');
+    try { peer.reconnect(); } catch(e) {}
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  MODO EMISSOR
+// ═══════════════════════════════════════════════════════
+function modoEmissor() {
+  modo = 'emissor';
+  mostrar('painelEmissor');
+
+  // Pré-preenche o código fixo e trava
+  const input = document.getElementById('inputCodigo');
+  input.value = CODIGO_FIXO;
+  input.readOnly = true;
+
+  // Já conecta automaticamente
+  setTimeout(conectar, 500);
+}
+
+function conectar() {
+  const codigo = (document.getElementById('inputCodigo').value || CODIGO_FIXO).trim();
+
+  document.getElementById('btnConectar').disabled = true;
+  document.getElementById('statusEmissor').textContent = '🔗 Conectando...';
+  document.getElementById('statusEmissor').className = 'status waiting';
+
+  if (peer && !peer.destroyed) {
+    try { peer.destroy(); } catch(e) {}
+  }
+
+  peer = new Peer(PEER_CONFIG);
+
+  peer.on('open', () => {
+    console.log('Emissor pronto, conectando...');
+    const destino = 'sinal-sonoro-' + codigo;
+    conn = peer.connect(destino, { reliable: true });
+
+    conn.on('open', () => {
+      console.log('Conectado!');
+      document.getElementById('statusEmissor').textContent = '✅ Conectado!';
+      document.getElementById('statusEmissor').className = 'status online';
+
+      setTimeout(() => {
+        mostrar('painelEmissorConectado');
+        document.getElementById('statusEmissorOnline').textContent = '✅ Conectado ao receptor';
+        document.getElementById('statusEmissorOnline').className = 'status online';
+        log('logEmissor', 'Conectado ao receptor');
+      }, 400);
+    });
+
+    conn.on('error', (err) => {
+      console.error(err);
+      log('logEmissor', 'Erro: ' + err);
+      reconectarEmissor();
+    });
+
+    conn.on('close', () => {
+      log('logEmissor', '⚠️ Conexão caiu — reconectando...');
+      document.getElementById('statusEmissorOnline').textContent = '⚠️ Reconectando...';
+      document.getElementById('statusEmissorOnline').className = 'status waiting';
+      reconectarEmissor();
+    });
+
+    // Timeout inicial
+    setTimeout(() => {
+      if (!conn || !conn.open) {
+        log('logEmissor', 'Tempo esgotado, tentando de novo...');
+        reconectarEmissor();
+      }
+    }, 8000);
+  });
+
+  peer.on('error', (err) => {
+    console.error('Erro peer emissor:', err);
+    log('logEmissor', 'Erro peer: ' + err.type);
+    reconectarEmissor();
+  });
+
+  peer.on('disconnected', () => {
+    try { peer.reconnect(); } catch(e) {}
+  });
+}
+
+function reconectarEmissor() {
+  if (reconectarTimer) return;
+  reconectarTimer = setTimeout(() => {
+    reconectarTimer = null;
+    console.log('Tentando reconectar emissor...');
+    conectar();
+  }, 3000);
+}
+
+function disparar() {
+  if (!conn || !conn.open) {
+    alert('Não está conectado');
+    return;
+  }
+  conn.send({ tipo: 'TOCAR', ts: Date.now() });
+  log('logEmissor', '🔔 Sinal enviado');
+  if (navigator.vibrate) navigator.vibrate(100);
+}
+
+// ═══════════════════════════════════════════════════════
+//  SOM
+// ═══════════════════════════════════════════════════════
+function tocarSom() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    const agora = ctx.currentTime;
+
+    for (let i = 0; i < 3; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880 + i * 200;
+      const t = agora + i * 0.4;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.6, t + 0.05);
+      gain.gain.linearRampToValueAtTime(0, t + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.4);
+    }
+
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 200]);
+    }
+    setTimeout(() => ctx.close(), 2000);
+  } catch (e) {
+    console.error('Erro ao tocar som:', e);
+  }
+}
+
+// Libera áudio na primeira interação do usuário
+document.body.addEventListener('click', () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    ctx.resume().then(() => ctx.close());
+  } catch(e) {}
+}, { once: true });
+
+</script>
+</body>
+</html>
